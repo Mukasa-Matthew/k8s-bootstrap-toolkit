@@ -1,0 +1,53 @@
+# ==============================================================================
+# Network Policy: Default Deny All (Zero-Trust Ingress & Egress)
+# ==============================================================================
+# This policy selects all pods in the namespace and denies all inbound
+# (ingress) and outbound (egress) traffic by default. Any desired communication
+# path must be explicitly allowed by additional NetworkPolicy objects.
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: production
+  labels:
+    app.kubernetes.io/part-of: platform-infrastructure
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# ==============================================================================
+# Network Policy: Baseline CoreDNS Egress
+# ==============================================================================
+# While default-deny is active, workloads require cluster internal DNS
+# resolution. This policy explicitly permits egress to CoreDNS on port 53 (UDP/TCP)
+# within the kube-system namespace.
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-coredns-egress
+  namespace: production
+  labels:
+    app.kubernetes.io/part-of: platform-infrastructure
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

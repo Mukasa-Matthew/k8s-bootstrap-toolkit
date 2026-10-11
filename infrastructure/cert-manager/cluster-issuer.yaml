@@ -1,0 +1,32 @@
+# ==============================================================================
+# cert-manager ClusterIssuer: Let's Encrypt Production
+# ==============================================================================
+# Issues valid public TLS certificates across all cluster namespaces using
+# Let's Encrypt ACME with the HTTP-01 challenge solver routed via Traefik.
+#
+# NOTE: Replace 'security-ops@example.com' with your registered ops email.
+# To avoid rate limits during testing, verify domains against the Let's Encrypt
+# staging environment before using this production issuer.
+# ==============================================================================
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+  labels:
+    app.kubernetes.io/part-of: platform-infrastructure
+    app.kubernetes.io/component: certificate-management
+spec:
+  acme:
+    # Let's Encrypt Production Directory
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: security-ops@example.com
+    privateKeySecretRef:
+      name: letsencrypt-production-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressTemplate:
+              metadata:
+                annotations:
+                  kubernetes.io/ingress.class: traefik
+                  traefik.ingress.kubernetes.io/router.entrypoints: web

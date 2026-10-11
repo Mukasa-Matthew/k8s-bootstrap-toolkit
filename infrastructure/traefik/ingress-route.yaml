@@ -1,0 +1,45 @@
+# ==============================================================================
+# Traefik Custom Resource Definition (CRD) Manifests
+# ==============================================================================
+# Demonstrates production IngressRoute and Security Middleware configurations.
+# ==============================================================================
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: production
+  labels:
+    app.kubernetes.io/part-of: platform-infrastructure
+spec:
+  headers:
+    frameDeny: true
+    sslRedirect: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 31536000
+    customFrameOptionsValue: SAMEORIGIN
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sample-app-ingress
+  namespace: production
+  labels:
+    app.kubernetes.io/name: sample-app
+    app.kubernetes.io/part-of: platform-infrastructure
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`app.example.com`) && PathPrefix(`/`)
+      kind: Rule
+      middlewares:
+        - name: security-headers
+      services:
+        - name: sample-app-service
+          port: 8080
+          strategy: RoundRobin
+  tls:
+    secretName: sample-app-tls

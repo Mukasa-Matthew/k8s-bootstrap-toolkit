@@ -1,0 +1,146 @@
+# ==============================================================================
+# Traefik Helm Chart - Production Values Configuration
+# ==============================================================================
+# Target Chart: traefik/traefik (https://helm.traefik.io/traefik)
+# ==============================================================================
+
+# Global configuration flags
+globalArguments:
+  - "--global.checknewversion=false"
+  - "--global.sendanonymoususage=false"
+
+# Deployment & Replica settings
+deployment:
+  enabled: true
+  replicas: 3
+  annotations: {}
+  labels:
+    app.kubernetes.io/part-of: platform-infrastructure
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9000"
+    prometheus.io/path: "/metrics"
+  podLabels: {}
+
+# High Availability: Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Topology spread & Anti-affinity to ensure high availability across nodes
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - traefik
+          topologyKey: "kubernetes.io/hostname"
+
+# Container Security Context (Hardened, non-root)
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsGroup: 65532
+  runAsUser: 65532
+  capabilities:
+    drop:
+      - ALL
+
+podSecurityContext:
+  fsGroup: 65532
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Compute Resources
+resources:
+  requests:
+    cpu: "200m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "512Mi"
+
+# EntryPoints Configuration
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+    protocol: TCP
+    # Permanent redirect to HTTPS
+    redirectTo:
+      port: websecure
+      priority: 10
+
+  websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+    protocol: TCP
+    tls:
+      enabled: true
+    http3:
+      enabled: false
+
+  traefik:
+    port: 9000
+    expose:
+      default: false
+    exposedPort: 9000
+    protocol: TCP
+
+# Ingress & CRD Providers
+providers:
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: true
+  kubernetesIngress:
+    enabled: true
+    allowExternalNameServices: false
+    publishedService:
+      enabled: true
+
+# Kubernetes Service Configuration
+service:
+  enabled: true
+  type: LoadBalancer
+  annotations: {}
+  # Preserve original client IP address
+  externalTrafficPolicy: Local
+
+# Structured Logging
+logs:
+  general:
+    level: INFO
+    format: json
+  access:
+    enabled: true
+    format: json
+    bufferingSize: 100
+    fields:
+      general:
+        defaultmode: keep
+      headers:
+        defaultmode: drop
+        names:
+          User-Agent: keep
+          Authorization: drop
+          Cookie: drop
+
+# Observability & Metrics
+metrics:
+  prometheus:
+    enabled: true
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    entryPoint: traefik
