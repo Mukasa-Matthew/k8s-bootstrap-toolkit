@@ -101,7 +101,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Creating pull request to merge ${BRANCH_NAME} into main..."
-          PR_URL=$(gh pr create \
+          set +e
+          PR_CREATE_OUTPUT=$(gh pr create \
             --base main \
             --head "${BRANCH_NAME}" \
             --title "ops(telemetry): cluster health & resource update (${BRANCH_NAME})" \
@@ -110,7 +111,21 @@ jobs:
           ### Summary of Changes:
           - Recorded mock cluster node health, resource utilization, and platform component status in \`docs/cluster-telemetry.log\`.
           - All 3/3 nodes reporting **HEALTHY** with nominal memory/CPU headroom.
-          - Ingress, cert-manager, and zero-trust network policies verified active.")
+          - Ingress, cert-manager, and zero-trust network policies verified active." 2>&1)
+          PR_CREATE_EXIT=$?
+          set -e
+
+          if [ "${PR_CREATE_EXIT}" -ne 0 ]; then
+            echo "${PR_CREATE_OUTPUT}"
+            if echo "${PR_CREATE_OUTPUT}" | grep -q "GitHub Actions is not permitted to create or approve pull requests"; then
+              echo "::warning::Skipping pull request creation because repository settings disallow PR creation by GitHub Actions. Branch pushed: ${BRANCH_NAME}"
+              exit 0
+            fi
+
+            exit "${PR_CREATE_EXIT}"
+          fi
+
+          PR_URL=$(echo "${PR_CREATE_OUTPUT}" | tail -n 1)
 
           echo "Pull request created successfully: ${PR_URL}"
           
